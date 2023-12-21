@@ -619,39 +619,6 @@ impl EcdhEsJweEncrypter {
         key_len: usize,
     ) -> Result<Vec<u8>, JoseError> {
         (|| -> anyhow::Result<Vec<u8>> {
-            let apu_vec;
-            let apu = match header.claim("apu") {
-                Some(Value::String(val)) => {
-                    apu_vec = util::decode_base64_urlsafe_no_pad(val)?;
-                    Some(apu_vec.as_slice())
-                }
-                Some(_) => bail!("The apu header claim must be string."),
-                None => match &self.agreement_partyuinfo {
-                    Some(val) => {
-                        let apu_b64 = util::encode_base64_urlsafe_nopad(val);
-                        header.set_claim("apu", Some(Value::String(apu_b64)))?;
-                        Some(val.as_slice())
-                    }
-                    None => None,
-                },
-            };
-            let apv_vec;
-            let apv = match header.claim("apv") {
-                Some(Value::String(val)) => {
-                    apv_vec = util::decode_base64_urlsafe_no_pad(val)?;
-                    Some(apv_vec.as_slice())
-                }
-                Some(_) => bail!("The apv header claim must be string."),
-                None => match &self.agreement_partyvinfo {
-                    Some(val) => {
-                        let apv_b64 = util::encode_base64_urlsafe_nopad(val);
-                        header.set_claim("apv", Some(Value::String(apv_b64)))?;
-                        Some(val.as_slice())
-                    }
-                    None => None,
-                },
-            };
-
             let mut map = Map::new();
             map.insert(
                 "kty".to_string(),
@@ -686,14 +653,50 @@ impl EcdhEsJweEncrypter {
                     let mut jwk: Map<String, Value> = key_pair.to_jwk_public_key().into();
 
                     match jwk.remove("x") {
-                        Some(val) => {
-                            map.insert("x".to_string(), val);
+                        Some(Value::String(val)) => {
+                            header.set_agreement_partyuinfo(util::decode_base64_urlsafe_no_pad(
+                                &val,
+                            )?);
+                            map.insert("x".to_string(), Value::String(val));
                         }
-                        None => unreachable!(),
+                        _ => unreachable!(),
                     }
 
                     key_pair.into_private_key()
                 }
+            };
+
+            let apu_vec;
+            let apu = match header.claim("apu") {
+                Some(Value::String(val)) => {
+                    apu_vec = util::decode_base64_urlsafe_no_pad(val)?;
+                    Some(apu_vec.as_slice())
+                }
+                Some(_) => bail!("The apu header claim must be string."),
+                None => match &self.agreement_partyuinfo {
+                    Some(val) => {
+                        let apu_b64 = util::encode_base64_urlsafe_nopad(val);
+                        header.set_claim("apu", Some(Value::String(apu_b64)))?;
+                        Some(val.as_slice())
+                    }
+                    None => None,
+                },
+            };
+            let apv_vec;
+            let apv = match header.claim("apv") {
+                Some(Value::String(val)) => {
+                    apv_vec = util::decode_base64_urlsafe_no_pad(val)?;
+                    Some(apv_vec.as_slice())
+                }
+                Some(_) => bail!("The apv header claim must be string."),
+                None => match &self.agreement_partyvinfo {
+                    Some(val) => {
+                        let apv_b64 = util::encode_base64_urlsafe_nopad(val);
+                        header.set_claim("apv", Some(Value::String(apv_b64)))?;
+                        Some(val.as_slice())
+                    }
+                    None => None,
+                },
             };
 
             header.set_claim("epk", Some(Value::Object(map)))?;
